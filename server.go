@@ -1,12 +1,8 @@
 package mailboss
 
 import (
-	"bufio"
-	"bytes"
-	"fmt"
-	"io"
 	"net"
-	"strings"
+	"net/textproto"
 	"time"
 )
 
@@ -39,7 +35,7 @@ func (s *Server) Listen(addr string) error {
 			}
 			return err
 		}
-		go Handle(conn, laddr)
+		go Handle(textproto.NewConn(conn), laddr)
 	}
 	return listener.Close()
 }
@@ -48,49 +44,18 @@ func (s *Server) Close() {
 	s.closed = true
 }
 
-func Handle(conn *net.TCPConn, laddr *net.TCPAddr) error {
-	conn.LocalAddr()
-	if err := WriteLine(conn, fmt.Sprintf("220 %s SMTP mailboss",
-		laddr.String())); err != nil {
+func Handle(conn *textproto.Conn, laddr *net.TCPAddr) error {
+	if err := conn.Writer.PrintfLine("220 %s SMTP mailboss",
+		laddr.String()); err != nil {
 		return err
 	}
-	conn.SetDeadline(time.Now().Add(time.Second))
-	recv, err := ReadLine(conn)
+	line, err := conn.ReadLine()
 	if err != nil {
 		return err
 	}
-	if err := WriteLine(conn, fmt.Sprintf("250 Hello %s, nice to meet you",
-		string(recv))); err != nil {
+	if err := conn.Writer.PrintfLine("250 Hello %s, nice to meet you",
+		line); err != nil {
 		return err
 	}
 	return nil
-}
-
-func WriteLine(w io.Writer, s string) error {
-	_, err := io.WriteString(w, fmt.Sprintf("%s%s", s, LINE_END))
-	return err
-}
-
-func ReadLine(r io.Reader) ([]byte, error) {
-	finder := &bytes.Buffer{}
-	buf := &bytes.Buffer{}
-	br := bufio.NewReader(r)
-	for {
-		c, err := br.ReadByte()
-		if err != nil && err != io.EOF {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		finder.WriteByte(c)
-		if !strings.HasPrefix(LINE_END, finder.String()) {
-			findBytes := finder.Bytes()
-			buf.WriteString(string(findBytes[:len(findBytes)-1]))
-			finder = bytes.NewBuffer([]byte{c})
-		} else if finder.Len() == len(LINE_END) {
-			return buf.Bytes(), nil
-		}
-	}
-	return buf.Bytes(), nil
 }
