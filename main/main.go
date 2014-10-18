@@ -1,3 +1,9 @@
 package main
 
-import ()
+import (
+	"github.com/Miniand/mailboss"
+)
+
+func main() {
+
+}
