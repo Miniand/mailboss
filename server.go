@@ -11,11 +11,31 @@ const (
 )
 
 type Server struct {
-	Listener *net.TCPListener
-	closed   bool
+	Addr        string
+	Handler     Handler
+	ReadTimeout time.Duration
 }
 
-func (s *Server) Listen(addr string) error {
+func Listen(addr string, handler Handler) error {
+	server := &Server{Addr: addr, Handler: handler}
+	return server.Listen()
+}
+
+func (s *Server) Listen() error {
+	addr := s.Addr
+	if addr == "" {
+		addr = ":smtp"
+	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	return s.Serve(ln.(*net.TCPListener))
+}
+
+func (s *Server) Serve(l net.Listener) error {
+	defer l.Close()
+	var tempDelay time.Duration
 	s.closed = false
 	laddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
